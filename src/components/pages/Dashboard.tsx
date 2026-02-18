@@ -63,94 +63,20 @@ interface BlockHeader {
   totalAmount?: number;
 }
 
-// Module-level flag to prevent reloading across navigations
-let dashboardLoaded = false;
-
 const Dashboard: React.FC = () => {
   const blocksContainerRef = useRef<HTMLDivElement>(null);
   const { getBlockByHeight, getBlockByHash, blocks } = useBlocks();
-  const [loading, setLoading] = useState<boolean>(() => {
-    // If we have visualizationBlocks in sessionStorage, start with loading=false
-    const saved = sessionStorage.getItem('dashboardVisualizationBlocks');
-    return !saved; // loading is true only if no saved data
-  });
+  const [loading, setLoading] = useState<boolean>(true);
   const [transactionPool, setTransactionPool] = useState<Transaction[]>([]);
-  const [visualizationBlocks, setVisualizationBlocks] = useState<Block[]>(() => {
-    const saved = sessionStorage.getItem('dashboardVisualizationBlocks');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [hashrateData, setHashrateData] = useState<ChartDataPoint[]>(() => {
-    const saved = sessionStorage.getItem('dashboardHashrateData');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [blockSizeData, setBlockSizeData] = useState<ChartDataPoint[]>(() => {
-    const saved = sessionStorage.getItem('dashboardBlockSizeData');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [transactionsData, setTransactionsData] = useState<ChartDataPoint[]>(() => {
-    const saved = sessionStorage.getItem('dashboardTransactionsData');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [predictedBlocks, setPredictedBlocks] = useState<number[]>(() => {
-    const saved = sessionStorage.getItem('dashboardPredictedBlocks');
-    return saved ? JSON.parse(saved) : [0, 0, 0, 0];
-  });
-  const [blockchainInfo, setBlockchainInfo] = useState<BlockchainInfo | null>(() => {
-    const saved = sessionStorage.getItem('dashboardBlockchainInfo');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [latestBlocks, setLatestBlocks] = useState<Block[]>(() => {
-    const saved = sessionStorage.getItem('dashboardLatestBlocks');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [latestTransactions, setLatestTransactions] = useState<Transaction[]>(() => {
-    const saved = sessionStorage.getItem('dashboardLatestTransactions');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [visualizationBlocks, setVisualizationBlocks] = useState<Block[]>([]);
+  const [hashrateData, setHashrateData] = useState<ChartDataPoint[]>([]);
+  const [blockSizeData, setBlockSizeData] = useState<ChartDataPoint[]>([]);
+  const [transactionsData, setTransactionsData] = useState<ChartDataPoint[]>([]);
+  const [predictedBlocks, setPredictedBlocks] = useState<number[]>([0, 0, 0, 0]);
+  const [blockchainInfo, setBlockchainInfo] = useState<BlockchainInfo | null>(null);
+  const [latestBlocks, setLatestBlocks] = useState<Block[]>([]);
+  const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
   const [countdowns, setCountdowns] = useState<string[]>(['~6min', '~5min', '~3min', '~90sec']);
-
-  // Helper functions to save data to sessionStorage
-  const saveHashrateData = useCallback((data: ChartDataPoint[]) => {
-    setHashrateData(data);
-    sessionStorage.setItem('dashboardHashrateData', JSON.stringify(data));
-  }, []);
-
-  const saveBlockSizeData = useCallback((data: ChartDataPoint[]) => {
-    setBlockSizeData(data);
-    sessionStorage.setItem('dashboardBlockSizeData', JSON.stringify(data));
-  }, []);
-
-  const saveTransactionsData = useCallback((data: ChartDataPoint[]) => {
-    setTransactionsData(data);
-    sessionStorage.setItem('dashboardTransactionsData', JSON.stringify(data));
-  }, []);
-
-  const saveBlockchainInfo = useCallback((info: BlockchainInfo) => {
-    setBlockchainInfo(info);
-    sessionStorage.setItem('dashboardBlockchainInfo', JSON.stringify(info));
-  }, []);
-
-  const saveLatestBlocks = useCallback((blocks: Block[]) => {
-    setLatestBlocks(blocks);
-    sessionStorage.setItem('dashboardLatestBlocks', JSON.stringify(blocks));
-  }, []);
-
-  const saveLatestTransactions = useCallback((txs: Transaction[]) => {
-    setLatestTransactions(txs);
-    sessionStorage.setItem('dashboardLatestTransactions', JSON.stringify(txs));
-  }, []);
-
-  const savePredictedBlocks = useCallback((blocks: number[]) => {
-    setPredictedBlocks(blocks);
-    sessionStorage.setItem('dashboardPredictedBlocks', JSON.stringify(blocks));
-  }, []);
-
-  const saveVisualizationBlocks = useCallback((blocks: Block[]) => {
-    console.log('Dashboard: Saving visualizationBlocks to sessionStorage:', blocks);
-    setVisualizationBlocks(blocks);
-    sessionStorage.setItem('dashboardVisualizationBlocks', JSON.stringify(blocks));
-  }, []);
 
   const updateCountdowns = useCallback(() => {
     const now = moment();
@@ -171,13 +97,6 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    // Skip if we already have visualizationBlocks loaded
-    if (visualizationBlocks.length >= 4) {
-      console.log('Dashboard: Data already loaded, skipping fetch');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -186,7 +105,6 @@ const Dashboard: React.FC = () => {
 
       // Use cached blocks if available, otherwise fetch current height directly
       if (blocks.length === 0) {
-        console.log('Dashboard: No blocks in cache yet, fetching current height directly');
         // Fetch current height directly from API
         const heightResponse = await fetch(`${config.api}/height`);
         const heightData = await heightResponse.json();
@@ -212,7 +130,6 @@ const Dashboard: React.FC = () => {
         }
         latestBlockHeader = blockData.result.block_header;
       } else {
-        console.log(`Dashboard: Found ${blocks.length} blocks in cache, loading dashboard data`);
         currentHeight = blocks[0].height; // Highest block is first
         latestBlockHeader = blocks[0];
       }
@@ -245,7 +162,7 @@ const Dashboard: React.FC = () => {
         }
       }
       // Reverse to show oldest to newest: 113, 114, 115, 116 (left to right)
-      saveVisualizationBlocks(minedBlocks.reverse());
+      setVisualizationBlocks(minedBlocks.reverse());
 
       // Calculate predicted block heights
       const predicted = [
@@ -254,10 +171,10 @@ const Dashboard: React.FC = () => {
         currentHeight + 3,
         currentHeight + 4
       ];
-      savePredictedBlocks(predicted);
+      setPredictedBlocks(predicted);
 
       // Set blockchain info
-      saveBlockchainInfo({
+      setBlockchainInfo({
         height: currentHeight,
         block_size: latestBlockHeader.block_size || 0,
         hashrate: latestBlockHeader.difficulty / 30, // difficulty_target = 30
@@ -314,9 +231,9 @@ const Dashboard: React.FC = () => {
         height: block.height
       })).reverse();
 
-      saveHashrateData(hashrate);
-      saveBlockSizeData(blockSize);
-      saveTransactionsData(transactions);
+      setHashrateData(hashrate);
+      setBlockSizeData(blockSize);
+      setTransactionsData(transactions);
 
       // Fetch latest 10 blocks for the table
       const latestBlocksTable: Block[] = [];
@@ -375,7 +292,7 @@ const Dashboard: React.FC = () => {
       }
 
       // Set the 10 blocks for the table (this overwrites the 4 blocks from visualization)
-      saveLatestBlocks(latestBlocksTable);
+      setLatestBlocks(latestBlocksTable);
 
       // Fetch latest 10 transactions by iterating through blocks
       const latestTxs: Transaction[] = [];
@@ -407,7 +324,7 @@ const Dashboard: React.FC = () => {
         }
       }
 
-      saveLatestTransactions(latestTxs);
+      setLatestTransactions(latestTxs);
 
       // Fetch transaction pool
       try {
@@ -425,7 +342,6 @@ const Dashboard: React.FC = () => {
       }
 
       setLoading(false);
-      dashboardLoaded = true;
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setLoading(false);
@@ -433,16 +349,7 @@ const Dashboard: React.FC = () => {
   }, [
     blocks,
     getBlockByHeight,
-    getBlockByHash,
-    visualizationBlocks.length,
-    saveHashrateData,
-    saveBlockSizeData,
-    saveTransactionsData,
-    saveBlockchainInfo,
-    saveLatestBlocks,
-    saveLatestTransactions,
-    savePredictedBlocks,
-    saveVisualizationBlocks
+    getBlockByHash
   ]);
 
   // Initial fetch on mount
@@ -450,15 +357,6 @@ const Dashboard: React.FC = () => {
     fetchDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Retry when blocks become available
-  useEffect(() => {
-    if (!dashboardLoaded && blocks.length > 0) {
-      console.log('Dashboard: Blocks are now available, fetching dashboard data');
-      fetchDashboardData();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks.length]);
 
   // Update countdowns every second
   useEffect(() => {
