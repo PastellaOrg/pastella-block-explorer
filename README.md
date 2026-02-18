@@ -125,6 +125,67 @@ npm run preview
 
 3. Deploy the `dist` folder to your web server or hosting provider.
 
+## Server Configuration
+
+This is a Single Page Application (SPA) that uses client-side routing. You must configure your web server to redirect all requests to `index.html` for the routing to work properly.
+
+### Nginx Configuration
+
+Add the `try_files` directive to your location block:
+
+```nginx
+root /var/www/pastella-explorer;
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+After updating, reload nginx: `nginx -s reload`
+
+#### Nginx Proxy Manager
+In your proxy host settings, go to the **Advanced** tab and add this to **Custom Nginx Configuration**:
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+### Apache Configuration
+
+Create a `.htaccess` file in your web root (where `index.html` is located):
+
+```apache
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+```
+
+### Other Hosting Platforms
+
+**Vercel**: Create `vercel.json`:
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+**Netlify**: Create `netlify.toml`:
+```toml
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+**GitHub Pages**: Create a `404.html` file identical to `index.html` (or use a SPA framework).
+
 ## Configuration
 
 The explorer can be customized through `src/config/explorer.ts`:
