@@ -133,8 +133,7 @@ const Dashboard: React.FC = () => {
 
           if (header && header.hash) {
             latestBlockHeader = header;
-            // Update currentHeight to match the found block
-            currentHeight = header.height;
+            // Don't update currentHeight - keep the API-reported height
           } else {
             // If we still can't get any block, use a minimal header
             latestBlockHeader = {
