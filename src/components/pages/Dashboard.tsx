@@ -106,38 +106,59 @@ const Dashboard: React.FC = () => {
       // Use cached blocks if available, otherwise fetch current height directly
       if (blocks.length === 0) {
         // Fetch current height directly from API
-        const heightResponse = await fetch(`${config.api}/height`);
-        const heightData = await heightResponse.json();
-        if (heightData.status !== 'OK') {
-          throw new Error('Failed to fetch current height');
-        }
-        currentHeight = heightData.height;
+        try {
+          const heightResponse = await fetch(`${config.api}/height`);
+          const heightData = await heightResponse.json();
+          if (heightData.status !== 'OK') {
+            throw new Error('Failed to fetch current height');
+          }
+          currentHeight = heightData.height;
 
-        // Fetch the latest block header directly from API (not through context to avoid race conditions)
-        const blockResponse = await fetch(`${config.api}/json_rpc`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: '1',
-            method: 'getblockheaderbyheight',
-            params: { height: currentHeight }
-          })
-        });
-        const blockData = await blockResponse.json();
-        if (blockData.error || !blockData.result?.block_header) {
-          throw new Error('Failed to fetch latest block header');
+          // Try to get the latest block through BlockContext
+          // Also try nearby blocks in case the current one is still being mined
+          let header = await getBlockByHeight(currentHeight);
+          if (!header || !header.hash) {
+            // Try to get the previous block (currentHeight - 1)
+            header = await getBlockByHeight(currentHeight - 1);
+          }
+          if (!header || !header.hash) {
+            // Try a few more blocks
+            for (let offset = 2; offset <= 5; offset++) {
+              header = await getBlockByHeight(currentHeight - offset);
+              if (header && header.hash) {
+                break;
+              }
+            }
+          }
+
+          if (header && header.hash) {
+            latestBlockHeader = header;
+            // Update currentHeight to match the found block
+            currentHeight = header.height;
+          } else {
+            // If we still can't get any block, use a minimal header
+            latestBlockHeader = {
+              height: currentHeight,
+              hash: '',
+              difficulty: 0,
+              timestamp: Date.now() / 1000,
+              block_size: 0
+            };
+            console.warn('Could not fetch block header for latest height');
+          }
+        } catch (error) {
+          console.error('Error fetching from API:', error);
+          throw new Error('Failed to fetch data from API. Please check if the server is running.');
         }
-        latestBlockHeader = blockData.result.block_header;
       } else {
         currentHeight = blocks[0].height; // Highest block is first
         latestBlockHeader = blocks[0];
       }
 
-      // Fetch last 4 CONFIRMED mined blocks including current
-      // Start from i=0 to get currentHeight (116), then 115, 114, 113
+      // Fetch last 4 CONFIRMED mined blocks (excluding current block which is still being mined)
+      // Start from i=1 to get currentHeight-1 (confirmed blocks), then currentHeight-2, etc.
       const minedBlocks: Block[] = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 1; i <= 4; i++) {
         const targetHeight = currentHeight - i;
         if (targetHeight < 0) break;
 
@@ -145,7 +166,6 @@ const Dashboard: React.FC = () => {
           const header = await getBlockByHeight(targetHeight);
 
           if (!header) {
-            console.error(`Block ${targetHeight} not found`);
             continue;
           }
 
@@ -164,12 +184,12 @@ const Dashboard: React.FC = () => {
       // Reverse to show oldest to newest: 113, 114, 115, 116 (left to right)
       setVisualizationBlocks(minedBlocks.reverse());
 
-      // Calculate predicted block heights
+      // Calculate predicted block heights (current block + future blocks)
       const predicted = [
+        currentHeight,
         currentHeight + 1,
         currentHeight + 2,
-        currentHeight + 3,
-        currentHeight + 4
+        currentHeight + 3
       ];
       setPredictedBlocks(predicted);
 
@@ -235,9 +255,9 @@ const Dashboard: React.FC = () => {
       setBlockSizeData(blockSize);
       setTransactionsData(transactions);
 
-      // Fetch latest 10 blocks for the table
+      // Fetch latest 10 blocks for the table (excluding current block which is still being mined)
       const latestBlocksTable: Block[] = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 1; i <= 10; i++) {
         const targetHeight = currentHeight - i;
         if (targetHeight < 0) break;
 
@@ -257,26 +277,13 @@ const Dashboard: React.FC = () => {
               transactions?: Array<{ amount_out?: number }>;
             };
 
-            // Debug: log full block to see structure
-            console.log(`Full block ${targetHeight}:`, fullBlock);
-
             // Calculate total amount from transaction outputs (including coinbase)
             if (fullBlock.transactions && Array.isArray(fullBlock.transactions)) {
               amountTotal = fullBlock.transactions.reduce((sum, tx) => sum + (tx.amount_out || 0), 0);
             }
-          } catch (fullBlockError) {
-            console.warn(`Could not fetch full block for ${targetHeight}, amount_total will be 0`, fullBlockError);
+          } catch {
+            // Silently skip if full block can't be fetched
           }
-
-          // Debug: log the header data
-          console.log(`Dashboard block ${targetHeight}:`, {
-            block_size: header.block_size,
-            num_txes: header.num_txes,
-            tx_count: header.tx_count,
-            blockSize: header.blockSize,
-            size: header.size,
-            amount_total: amountTotal
-          });
 
           latestBlocksTable.push({
             height: header.height,
@@ -299,28 +306,37 @@ const Dashboard: React.FC = () => {
       let txCount = 0;
       let currentBlockHash = latestBlockHeader.hash;
 
-      while (txCount < 10) {
-        try {
-          const block = await getBlockByHash(currentBlockHash);
+      // Only fetch transactions if we have a valid starting hash
+      if (!currentBlockHash) {
+        console.warn('No valid block hash available, skipping transaction fetch');
+      } else {
+        while (txCount < 10) {
+          try {
+            const block = await getBlockByHash(currentBlockHash);
 
-          if (!block) {
-            console.error(`Block ${currentBlockHash} not found`);
+            if (!block) {
+              console.warn(`Block ${currentBlockHash} not found, stopping transaction fetch`);
+              break;
+            }
+
+            if (block.transactions && Array.isArray(block.transactions)) {
+              for (const tx of block.transactions) {
+                if (txCount >= 10) break;
+
+                latestTxs.push(tx as Transaction);
+                txCount++;
+              }
+            }
+
+            currentBlockHash = block.prev_hash || '';
+            if (!currentBlockHash) {
+              console.warn('No previous block hash available, reached genesis block');
+              break;
+            }
+          } catch (error) {
+            console.warn('Error fetching transactions:', error);
             break;
           }
-
-          if (block.transactions && Array.isArray(block.transactions)) {
-            for (const tx of block.transactions) {
-              if (txCount >= 10) break;
-
-              latestTxs.push(tx as Transaction);
-              txCount++;
-            }
-          }
-
-          currentBlockHash = block.prev_hash || '';
-        } catch (error) {
-          console.error('Error fetching transactions:', error);
-          break;
         }
       }
 
@@ -644,7 +660,7 @@ const Dashboard: React.FC = () => {
             <div className="card-body" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ width: '100%', height: '175px', minHeight: '175px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', overflow: 'hidden' }}>
                 {hashrateData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" style={{ margin: 0 }}>
+                  <ResponsiveContainer width="100%" height={175} minWidth={0} style={{ margin: 0 }}>
                     <AreaChart data={hashrateData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                       <defs>
                         <linearGradient id="colorHashrate" x1="0" y1="0" x2="0" y2="1">
@@ -704,7 +720,7 @@ const Dashboard: React.FC = () => {
             <div className="card-body" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ width: '100%', height: '175px', minHeight: '175px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', overflow: 'hidden' }}>
                 {blockSizeData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" style={{ margin: 0 }}>
+                  <ResponsiveContainer width="100%" height={175} minWidth={0} style={{ margin: 0 }}>
                     <AreaChart data={blockSizeData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                       <defs>
                         <linearGradient id="colorBlockSize" x1="0" y1="0" x2="0" y2="1">
@@ -764,7 +780,7 @@ const Dashboard: React.FC = () => {
             <div className="card-body" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ width: '100%', height: '175px', minHeight: '175px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', overflow: 'hidden' }}>
                 {transactionsData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" style={{ margin: 0 }}>
+                  <ResponsiveContainer width="100%" height={175} minWidth={0} style={{ margin: 0 }}>
                     <AreaChart data={transactionsData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                       <defs>
                         <linearGradient id="colorTransactions" x1="0" y1="0" x2="0" y2="1">
