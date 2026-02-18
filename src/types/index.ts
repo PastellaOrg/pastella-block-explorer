@@ -139,20 +139,4 @@ export interface SearchHistoryItem {
   type: string;
 }
 
-export default {
-  BlockHeader,
-  Block,
-  TransactionInput,
-  TransactionOutput,
-  Transaction,
-  WalletInfo,
-  PoolInfo,
-  NodeInfo,
-  TransactionPoolInfo,
-  BlockchainInfo,
-  PriceInfo,
-  SearchResult,
-  ChartData,
-  PoolStats,
-  SearchHistoryItem
-};
+// Types are exported as named exports - no default export needed with verbatimModuleSyntax

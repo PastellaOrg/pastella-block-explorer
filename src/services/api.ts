@@ -82,38 +82,38 @@ class APIService {
 
   // Get current block height
   async getHeight(): Promise<{ count: number; status: string }> {
-    return this.jsonRPC('getblockcount');
+    return this.jsonRPC('getblockcount') as unknown as { count: number; status: string };
   }
 
   // Get block by height
   async getBlockByHeight(height: number): Promise<BlockHeader> {
-    return this.jsonRPC('getblockheaderbyheight', { height });
+    return this.jsonRPC('getblockheaderbyheight', { height }) as unknown as BlockHeader;
   }
 
   // Get block by hash
   async getBlockByHash(hash: string): Promise<BlockHeader> {
-    return this.jsonRPC('getblockheaderbyhash', { hash });
+    return this.jsonRPC('getblockheaderbyhash', { hash }) as unknown as BlockHeader;
   }
 
   // Get last block header
   async getLastBlockHeader(): Promise<{ block_header: BlockHeader }> {
-    return this.jsonRPC('getlastblockheader', {});
+    return this.jsonRPC('getlastblockheader', {}) as unknown as { block_header: BlockHeader };
   }
 
   // Get full block details by hash (includes transactions)
   async getFullBlockByHash(hash: string): Promise<{ block: Block }> {
-    const response = await this.jsonRPC('f_block_json', { hash }) as { status: string; block: Block };
+    const response = await this.jsonRPC('f_block_json', { hash }) as unknown as { status: string; block: Block };
     return { block: response.block };
   }
 
   // Get transaction details by hash
   async getTransactionDetails(hash: string): Promise<{ transaction: Transaction }> {
-    return this.jsonRPC('f_transaction_json', { hash });
+    return this.jsonRPC('f_transaction_json', { hash }) as unknown as { transaction: Transaction };
   }
 
   // Get transaction pool (memory pool)
   async getTransactionPool(): Promise<{ addedTxs: Transaction[] } | { transactions: Transaction[] }> {
-    return this.jsonRPC('f_on_transactions_pool_json', {});
+    return this.jsonRPC('f_on_transactions_pool_json', {}) as unknown as { addedTxs: Transaction[] } | { transactions: Transaction[] };
   }
 
   // Get transaction by hash

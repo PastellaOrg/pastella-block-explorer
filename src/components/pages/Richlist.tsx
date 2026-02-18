@@ -19,6 +19,9 @@ interface RichlistResponse {
   status: string;
   count: number;
   richlist: RichlistEntry[];
+  error?: {
+    message: string;
+  };
 }
 
 const Richlist: React.FC = () => {

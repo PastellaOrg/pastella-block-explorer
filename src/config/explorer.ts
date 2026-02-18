@@ -9,7 +9,6 @@ export interface Config {
   maxSupply: number;
   addressPrefix: string;
   addressPrefixBytes: number[];
-  forkHeights: number[];
   requiredConfirmations: number;
   refreshIntervals: {
     dashboard: number;
@@ -28,7 +27,7 @@ export interface Config {
 
 export const config: Config = {
   // Local API configuration
-  api: 'http://192.168.1.15:21001',
+  api: 'https://seed.pastella.org',
 
   // Cryptocurrency details
   name: 'Pastella',
@@ -39,12 +38,6 @@ export const config: Config = {
   addressPrefix: 'PAS',
   addressPrefixBytes: [0x19, 0x80, 0x04], // 0x198004 in little-endian format
   requiredConfirmations: 10,
-
-  // Fork heights
-  forkHeights: [
-    1400000, 2500000, 3100000, 4000000, 4300000,
-    6000000, 8000000, 9000000, 10000000, 11000000
-  ],
 
   // Refresh intervals (in milliseconds)
   refreshIntervals: {

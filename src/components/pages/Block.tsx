@@ -17,11 +17,12 @@ import {
   faHashtag,
   faCube
 } from '@fortawesome/free-solid-svg-icons';
+import type { Block } from '../../types';
 
-const Block: React.FC = () => {
+const BlockPage: React.FC = () => {
   const { hashOrHeight } = useParams<{ hashOrHeight: string }>();
   const [loading, setLoading] = useState<boolean>(true);
-  const [block, setBlock] = useState<Record<string, unknown> | null>(null);
+  const [block, setBlock] = useState<Block | null>(null);
   const [confirmations, setConfirmations] = useState<number>(0);
   const [price, setPrice] = useState<number>(0);
   const [nextBlockHash, setNextBlockHash] = useState<string | null>(null);
@@ -76,8 +77,8 @@ const Block: React.FC = () => {
           setPrice(0);
         }
 
-        setBlock(blockData.block);
-        setConfirmations(info.height - blockData.block.height);
+        setBlock(blockData.block as Block);
+        setConfirmations(info.height - (blockData.block.height as number));
         setLoading(false);
       } catch (error) {
         console.error('Error fetching block:', error);
@@ -141,7 +142,7 @@ const Block: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link
-              to={`/block/${block.prev_hash as string}`}
+              to={`/block/${(block as unknown as Record<string, unknown>).prev_hash as string}`}
               style={{
                 padding: '8px 12px',
                 background: (block.height as number) <= 0 ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.1)',
@@ -247,7 +248,7 @@ const Block: React.FC = () => {
                       TRANSACTIONS
                     </div>
                     <div style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 600, wordBreak: 'break-word' }}>
-                      {(block.transactions as Array<{ [key: string]: unknown }> | undefined)?.length || 0}
+                      {(block.transactions as unknown[] | undefined)?.length || 0}
                     </div>
                   </div>
                   <span style={{
@@ -261,7 +262,7 @@ const Block: React.FC = () => {
                     fontSize: '0.7rem',
                     fontWeight: 600
                   }}>
-                    {(block.transactionsCumulativeSize as number | undefined)?.toLocaleString() || '0'} bytes
+                    {((block as unknown as Record<string, unknown>).transactionsCumulativeSize as number | undefined)?.toLocaleString() || '0'} bytes
                   </span>
                 </div>
               </div>
@@ -283,7 +284,7 @@ const Block: React.FC = () => {
                       SIZE
                     </div>
                     <div style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 600, wordBreak: 'break-word' }}>
-                      {(block.blockSize as number | undefined)?.toLocaleString() || '0'}
+                      {((block as unknown as Record<string, unknown>).blockSize as number | undefined)?.toLocaleString() || '0'}
                     </div>
                   </div>
                 </div>
@@ -367,7 +368,7 @@ const Block: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.95rem', color: '#10b981', fontWeight: 600, wordBreak: 'break-word' }}>
-                        {formatAmount((block.totalFeeAmount as number) || 0)}
+                        {formatAmount(((block as unknown as Record<string, unknown>).totalFeeAmount as number) || 0)}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)' }}>
                         {config.ticker}
@@ -463,10 +464,10 @@ const Block: React.FC = () => {
                       PREVIOUS BLOCK
                     </div>
                     <Link
-                      to={`/block/${block.prev_hash as string}`}
+                      to={`/block/${(block as unknown as Record<string, unknown>).prev_hash as string}`}
                       style={{ color: '#FF8AFB', textDecoration: 'none', fontSize: '0.75rem', fontFamily: 'monospace', wordBreak: 'break-all', lineHeight: '1.5' }}
                     >
-                      {block.prev_hash as string}
+                      {(block as unknown as Record<string, unknown>).prev_hash as string}
                     </Link>
                   </div>
                 </div>
@@ -489,7 +490,7 @@ const Block: React.FC = () => {
                       GENERATED COINS
                     </div>
                     <div style={{ fontSize: '0.85rem', color: '#f1f2f3', wordBreak: 'break-word' }}>
-                      {formatAmount(parseFloat((block.alreadyGeneratedCoins as string) || '0'))} {config.ticker}
+                      {formatAmount(parseFloat(((block as unknown as Record<string, unknown>).alreadyGeneratedCoins as string) || '0'))} {config.ticker}
                     </div>
                   </div>
                 </div>
@@ -520,7 +521,7 @@ const Block: React.FC = () => {
                   fontSize: '0.75rem',
                   fontWeight: 600
                 }}>
-                  {(block.transactions as Array<{ [key: string]: unknown }> | undefined)?.length || 0}
+                  {(block.transactions as unknown[] | undefined)?.length || 0}
                 </span>
               </div>
             </div>
@@ -540,14 +541,14 @@ const Block: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {!block.transactions || block.transactions.length === 0 ? (
+                    {!block.transactions || (block.transactions as unknown[]).length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center p-4" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
                           No transactions in this block
                         </td>
                       </tr>
                     ) : (
-                      (block.transactions as Array<{ [key: string]: unknown }>).map((tx, index: number) => {
+                      ((block as unknown as Record<string, unknown>).transactions as Array<{ [key: string]: unknown }> || []).map((tx, index: number) => {
                         const txAmount = (tx.amount_out || tx.amount || 0) as number;
                         const txFee = (tx.fee || 0) as number;
                         const txSize = (tx.size || 0) as number;
@@ -559,7 +560,7 @@ const Block: React.FC = () => {
 
                         return (
                           <tr key={index} style={{
-                            borderBottom: index === block.transactions.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)'
+                            borderBottom: index === (block.transactions as unknown[]).length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)'
                           }}>
                             <td style={{ padding: '16px', color: '#e2e8f0', fontSize: '0.75rem', fontFamily: 'monospace' }}>
                               <Link
@@ -618,4 +619,4 @@ const Block: React.FC = () => {
   );
 };
 
-export default Block;
+export default BlockPage;

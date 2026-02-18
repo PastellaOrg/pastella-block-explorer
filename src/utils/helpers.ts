@@ -1,6 +1,13 @@
 import moment from 'moment';
 import config from '../config/explorer';
 import bs58 from 'bs58';
+import { keccak256 } from 'js-sha3';
+
+// CryptoNote's cn_fast_hash implementation using Keccak-256
+function cn_fast_hash(data: Uint8Array | string): Uint8Array {
+  const hashHex = keccak256(data);
+  return new Uint8Array(hashHex.match(/[\da-f]{2}/gi)!.map(b => parseInt(b, 16)));
+}
 
 // Number formatting with commas
 export const numberWithCommas = (x: number | string): string => {

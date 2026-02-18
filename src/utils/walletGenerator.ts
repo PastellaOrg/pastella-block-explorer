@@ -10,7 +10,6 @@
  * - Correct address generation
  */
 
-import * as crypto from 'crypto';
 import * as Ed25519 from '@noble/ed25519';
 import { keccak256 } from 'js-sha3';
 
@@ -23,13 +22,17 @@ declare module '@noble/ed25519' {
   }
 }
 
-// Configure SHA-512 for noble-ed25519
-if (Ed25519.hashes) {
+// Configure SHA-512 for noble-ed25519 (only in Node.js environment)
+// In browser, the library uses its own implementation
+if (typeof window === 'undefined' && Ed25519.hashes) {
+  /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+  const nodeCrypto = require('crypto');
   Ed25519.hashes.sha512 = (msg: Uint8Array) => {
-    const hash = crypto.createHash('sha512');
+    const hash = nodeCrypto.createHash('sha512');
     hash.update(Buffer.from(msg));
     return new Uint8Array(hash.digest());
   };
+  /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
 }
 
 // ============================================================================
@@ -630,11 +633,11 @@ async function generateRandomBytes(length: number): Promise<Uint8Array> {
   }
 
   // Fallback to Node.js crypto module for server-side rendering
-  if (typeof crypto !== 'undefined') {
-    const nodeCrypto = crypto as { randomBytes: (length: number) => Buffer };
-    if (nodeCrypto.randomBytes) {
-      return new Uint8Array(nodeCrypto.randomBytes(length));
-    }
+  if (typeof window === 'undefined') {
+    /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+    const nodeCrypto = require('crypto');
+    return new Uint8Array(nodeCrypto.randomBytes(length));
+    /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
   }
 
   throw new Error('No secure random number generator available');

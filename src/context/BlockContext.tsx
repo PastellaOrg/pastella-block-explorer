@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import config from '../config/explorer';
 
-interface BlockData {
+export interface BlockData {
   major_version: number;
   minor_version: number;
   timestamp: number;
@@ -21,7 +22,6 @@ interface BlockData {
 
 interface FullBlockData extends BlockData {
   transactions?: Array<{ [key: string]: unknown }>;
-  prev_hash?: string;
 }
 
 // Permanent cache for blocks - blocks are immutable and never change
@@ -205,7 +205,7 @@ export const BlockProvider: React.FC<BlockProviderProps> = ({ children }) => {
         // Also add to cache if it's a block header
         setBlocks(prev => {
           const existingMap = new Map(prev.map(b => [b.hash, b]));
-          existingMap.set(block.hash, block);
+          existingMap.set(block.hash, block as BlockData);
           return Array.from(existingMap.values()).sort((a, b) => b.height - a.height);
         });
       }

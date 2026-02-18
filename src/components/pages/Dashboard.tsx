@@ -400,7 +400,7 @@ const Dashboard: React.FC = () => {
             }
           }
 
-          currentBlockHash = block.prev_hash;
+          currentBlockHash = block.prev_hash || '';
         } catch (error) {
           console.error('Error fetching transactions:', error);
           break;
@@ -413,10 +413,10 @@ const Dashboard: React.FC = () => {
       try {
         const poolData = await apiService.getTransactionPool();
         // Handle different response formats
-        if (poolData.addedTxs) {
-          setTransactionPool(poolData.addedTxs as Transaction[]);
-        } else if (poolData.transactions) {
-          setTransactionPool(poolData.transactions as Transaction[]);
+        if ('addedTxs' in poolData && poolData.addedTxs) {
+          setTransactionPool(poolData.addedTxs as unknown as Transaction[]);
+        } else if ('transactions' in poolData && poolData.transactions) {
+          setTransactionPool(poolData.transactions as unknown as Transaction[]);
         } else {
           setTransactionPool([]);
         }

@@ -105,9 +105,9 @@ const Blocks: React.FC = () => {
       const aVal = a[sortBy];
       const bVal = b[sortBy];
       if (sortOrder === 'asc') {
-        return aVal > bVal ? 1 : -1;
+        return (aVal || 0) > (bVal || 0) ? 1 : -1;
       } else {
-        return aVal < bVal ? 1 : -1;
+        return (aVal || 0) < (bVal || 0) ? 1 : -1;
       }
     });
 

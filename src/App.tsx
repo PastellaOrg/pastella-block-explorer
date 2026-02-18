@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/shared';
 import Wallet from './components/pages/Wallet';
 import Dashboard from './components/pages/Dashboard';
-import Block from './components/pages/Block';
+import BlockPage from './components/pages/Block';
 import Blocks from './components/pages/Blocks';
 import Transactions from './components/pages/Transactions';
 import TransactionDetails from './components/pages/TransactionDetails';
@@ -46,7 +46,7 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/blocks" element={<Blocks />} />
-              <Route path="/block/:hashOrHeight" element={<Block />} />
+              <Route path="/block/:hashOrHeight" element={<BlockPage />} />
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/transaction/:hash" element={<TransactionDetails />} />
               <Route path="/wallet/:address" element={<Wallet />} />

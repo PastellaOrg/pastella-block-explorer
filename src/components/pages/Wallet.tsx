@@ -14,6 +14,35 @@ import {
 } from '../../utils/helpers';
 import type { WalletInfo } from '../../types';
 
+// API response types (different from our WalletInfo interface)
+interface WalletApiResponse {
+  address?: string;
+  total_balance?: number;
+  total_incoming?: number;
+  total_outgoing?: number;
+  total_incoming_staking_rewards?: number;
+  total_outgoing_stakes?: number;
+  total_transactions?: number;
+  first_tx_timestamp?: number;
+  last_tx_timestamp?: number;
+  transactions?: WalletTransaction[];
+  pagination?: {
+    total_pages?: number;
+    page?: number;
+  };
+}
+
+interface WalletTransaction {
+  tx_hash?: string;
+  block_number?: number;
+  amount?: number;
+  fee?: number;
+  timestamp?: number;
+  type?: string;
+  from?: string[];
+  to?: string[];
+}
+
 const Wallet: React.FC = () => {
   const { address } = useParams<{ address: string }>();
 
@@ -37,7 +66,7 @@ const Wallet: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getWalletDetails(addr, page, config.pagination.walletTransactions);
+      const data = await apiService.getWalletDetails(addr, page, config.pagination.walletTransactions) as WalletApiResponse;
 
       // Check if data is valid
       if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
@@ -55,7 +84,7 @@ const Wallet: React.FC = () => {
         transactionCount: data.total_transactions || 0,
         firstTxDate: data.first_tx_timestamp ? data.first_tx_timestamp.toString() : undefined,
         lastTxDate: data.last_tx_timestamp ? data.last_tx_timestamp.toString() : undefined,
-        transactions: data.transactions || [],
+        transactions: (data.transactions || []) as unknown as typeof walletInfo.transactions,
         totalPages: data.pagination?.total_pages || 1,
         currentPage: data.pagination?.page || page
       };
@@ -491,11 +520,13 @@ const Wallet: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      walletData.transactions.map((tx, index: number) => {
+                      (walletData.transactions as WalletTransaction[]).map((tx, index: number) => {
                         const txType = formatTransactionType(tx.type || 'TRANSFER');
+                        const txHash = tx.tx_hash || '';
+                        const blockHeight = tx.block_number || 0;
                         return (
                           <tr
-                            key={tx.tx_hash}
+                            key={txHash}
                             style={{
                               borderBottom: index === walletData.transactions.length - 1
                                 ? 'none'
@@ -558,14 +589,14 @@ const Wallet: React.FC = () => {
                               fontFamily: 'monospace'
                             }}>
                               <Link
-                                to={`/transaction/${tx.tx_hash}`}
+                                to={`/transaction/${txHash}`}
                                 style={{
                                   color: '#FF8AFB',
                                   textDecoration: 'underline',
                                   textDecorationStyle: 'dotted'
                                 }}
                               >
-                                {truncateHash(tx.tx_hash, 15, 15)}
+                                {truncateHash(txHash, 15, 15)}
                               </Link>
                             </td>
                             <td data-label="Block" style={{
@@ -576,14 +607,14 @@ const Wallet: React.FC = () => {
                               fontWeight: 500
                             }}>
                               <Link
-                                to={`/block/${tx.block_number}`}
+                                to={`/block/${blockHeight}`}
                                 style={{
                                   color: '#FF8AFB',
                                   textDecoration: 'underline',
                                   textDecorationStyle: 'dotted'
                                 }}
                               >
-                                #{tx.block_number}
+                                #{blockHeight}
                               </Link>
                             </td>
                             <td data-label="Amount" style={{

@@ -10,6 +10,7 @@ import { faTachometerAlt, faCubes, faMoneyBillAlt, faSwimmingPool, faServer, faT
 library.add(faTachometerAlt, faCubes, faMoneyBillAlt, faSwimmingPool, faServer, faTools, faInfo, faWallet, faExchangeAlt, faCopy, faCoins, faClock, faHashtag, faCube, faArrowLeft, faArrowRight, faDatabase, faChartLine, faCheckCircle);
 
 import App from './App.tsx'
+// @ts-expect-error - Error.jsx is a JavaScript React component
 import ErrorLayout from './Error.jsx'
 
 createRoot(document.getElementById('root')!).render(
