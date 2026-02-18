@@ -25,14 +25,14 @@ declare module '@noble/ed25519' {
 // Configure SHA-512 for noble-ed25519 (only in Node.js environment)
 // In browser, the library uses its own implementation
 if (typeof window === 'undefined' && Ed25519.hashes) {
-  /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const nodeCrypto = require('crypto');
   Ed25519.hashes.sha512 = (msg: Uint8Array) => {
     const hash = nodeCrypto.createHash('sha512');
     hash.update(Buffer.from(msg));
     return new Uint8Array(hash.digest());
   };
-  /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+  /* eslint-enable @typescript-eslint/no-require-imports */
 }
 
 // ============================================================================
@@ -634,10 +634,10 @@ async function generateRandomBytes(length: number): Promise<Uint8Array> {
 
   // Fallback to Node.js crypto module for server-side rendering
   if (typeof window === 'undefined') {
-    /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+    /* eslint-disable @typescript-eslint/no-require-imports */
     const nodeCrypto = require('crypto');
     return new Uint8Array(nodeCrypto.randomBytes(length));
-    /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+    /* eslint-enable @typescript-eslint/no-require-imports */
   }
 
   throw new Error('No secure random number generator available');
