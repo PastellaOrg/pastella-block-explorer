@@ -63,6 +63,39 @@ interface BlockHeader {
   totalAmount?: number;
 }
 
+// Formatting utilities
+const formatHashrate = (hashrate: number): string => {
+  if (hashrate === 0) return '0 H/s';
+  const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s'];
+  let value = hashrate;
+  let unitIndex = 0;
+
+  while (value >= 1000 && unitIndex < units.length - 1) {
+    value /= 1000;
+    unitIndex++;
+  }
+
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${units[unitIndex]}`;
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${units[unitIndex]}`;
+};
+
+const formatTransactions = (count: number): string => {
+  return count.toLocaleString();
+};
+
 const Dashboard: React.FC = () => {
   const blocksContainerRef = useRef<HTMLDivElement>(null);
   const { getBlockByHeight, getBlockByHash, blocks } = useBlocks();
@@ -420,7 +453,7 @@ const Dashboard: React.FC = () => {
             {dateStr}
           </p>
           <p style={{ margin: '0 0 4px 0', color: '#10b981', fontWeight: 'bold' }}>
-            Hashrate: {Math.round(data.y)} H/s
+            Hashrate: {formatHashrate(data.y)}
           </p>
           {data.difficulty && (
             <p style={{ margin: 0, color: '#06b6d4', fontWeight: '600' }}>
@@ -455,7 +488,7 @@ const Dashboard: React.FC = () => {
             {dateStr}
           </p>
           <p style={{ margin: '0 0 4px 0', color: '#6366f1', fontWeight: 'bold' }}>
-            Block Size: {data.y.toFixed(0)} bytes
+            Block Size: {formatBytes(data.y)}
           </p>
           {data.height !== undefined && (
             <p style={{ margin: 0, color: '#06b6d4', fontWeight: '600' }}>
@@ -490,7 +523,7 @@ const Dashboard: React.FC = () => {
             {dateStr}
           </p>
           <p style={{ margin: '0 0 4px 0', color: '#f59e0b', fontWeight: 'bold' }}>
-            Transactions: {data.y.toFixed(0)}
+            Transactions: {formatTransactions(data.y)}
           </p>
           {data.height !== undefined && (
             <p style={{ margin: 0, color: '#06b6d4', fontWeight: '600' }}>
@@ -652,7 +685,7 @@ const Dashboard: React.FC = () => {
                   color: '#10b981',
                   fontSize: '0.75rem'
                 }}>
-                  {hashrateData.length > 0 ? Math.round(hashrateData[hashrateData.length - 1].y) : 0} H/s
+                  {formatHashrate(hashrateData.length > 0 ? hashrateData[hashrateData.length - 1].y : 0)}
                 </span>
               </div>
             </div>
@@ -712,7 +745,7 @@ const Dashboard: React.FC = () => {
                   color: '#6366f1',
                   fontSize: '0.75rem'
                 }}>
-                  {blockchainInfo?.block_size || 0} bytes
+                  {formatBytes(blockchainInfo?.block_size || 0)}
                 </span>
               </div>
             </div>
@@ -772,7 +805,7 @@ const Dashboard: React.FC = () => {
                   color: '#f59e0b',
                   fontSize: '0.75rem'
                 }}>
-                  {transactionsData.reduce((sum, item) => sum + item.y, 0)}
+                  {formatTransactions(transactionsData.reduce((sum, item) => sum + item.y, 0))}
                 </span>
               </div>
             </div>
