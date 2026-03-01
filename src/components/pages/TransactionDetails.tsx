@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCube, faCoins, faClock, faDatabase, faHashtag, faCopy, faChartLine } from '@fortawesome/free-solid-svg-icons';
+import { faCube, faCoins, faClock, faDatabase, faHashtag, faCopy, faChartLine, faHourglassHalf } from '@fortawesome/free-solid-svg-icons';
 import config from '../../config/explorer';
 import moment from 'moment';
 
@@ -51,10 +51,44 @@ interface TransactionData {
   };
 }
 
+interface PoolInput {
+  amount: number;
+  amount_formatted: string;
+  spending: {
+    transaction_hash: string;
+    output_index: number;
+  };
+  from_address: string;
+}
+
+interface PoolOutput {
+  index: number;
+  address: string;
+  amount: number;
+  amount_formatted: string;
+}
+
+interface PoolTransactionData {
+  hash: string;
+  fee: number;
+  fee_formatted: string;
+  amount_in: number;
+  amount_in_formatted: string;
+  amount_out: number;
+  amount_out_formatted: string;
+  size: number;
+  unlock_time: number;
+  type: string;
+  outputs: PoolOutput[];
+  inputs: PoolInput[];
+}
+
 const TransactionDetails: React.FC = () => {
   const { hash } = useParams<{ hash: string }>();
   const [loading, setLoading] = useState<boolean>(true);
   const [txData, setTxData] = useState<TransactionData | null>(null);
+  const [poolTxData, setPoolTxData] = useState<PoolTransactionData | null>(null);
+  const [isPoolTransaction, setIsPoolTransaction] = useState<boolean>(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,8 +97,9 @@ const TransactionDetails: React.FC = () => {
 
       try {
         setLoading(true);
+        setIsPoolTransaction(false);
 
-        // Fetch transaction details
+        // First, try to fetch as a confirmed transaction
         const response = await fetch(`${config.api}/json_rpc`, {
           method: 'POST',
           headers: {
@@ -83,13 +118,39 @@ const TransactionDetails: React.FC = () => {
         const data = await response.json();
 
         if (data.error) {
-          throw new Error(data.error.message);
+          // Not a confirmed transaction, try transaction pool
+          await fetchPoolTransaction(hash);
+        } else {
+          setTxData(data.result);
+          setPoolTxData(null);
+          setIsPoolTransaction(false);
+          setLoading(false);
         }
+      } catch {
+        // If confirmed transaction fetch fails, try pool
+        await fetchPoolTransaction(hash);
+      }
+    };
 
-        setTxData(data.result);
+    const fetchPoolTransaction = async (txHash: string) => {
+      try {
+        const poolResponse = await fetch(`${config.api}/pool`);
+        const poolData = await poolResponse.json();
+
+        if (poolData.result?.status === 'OK' && poolData.result.transactions) {
+          const poolTx = poolData.result.transactions.find((t: PoolTransactionData) => t.hash === txHash);
+          if (poolTx) {
+            setPoolTxData(poolTx);
+            setTxData(null);
+            setIsPoolTransaction(true);
+            setLoading(false);
+            return;
+          }
+        }
+        // Transaction not found in pool either
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching transaction:', error);
+        console.error('Error fetching pool transaction:', error);
         setLoading(false);
       }
     };
@@ -126,7 +187,7 @@ const TransactionDetails: React.FC = () => {
     );
   }
 
-  if (!txData) {
+  if (!txData && !poolTxData) {
     return (
       <div className="text-center py-5" style={{ marginTop: '100px' }}>
         <h5 style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Transaction not found</h5>
@@ -134,7 +195,484 @@ const TransactionDetails: React.FC = () => {
     );
   }
 
-  const { block, tx, txDetails } = txData;
+  // Pool transaction rendering
+  if (isPoolTransaction && poolTxData) {
+    return (
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px 60px' }}>
+        {/* Header */}
+        <div style={{
+          marginBottom: '24px',
+          paddingBottom: '16px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+              TRANSACTION
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)' }}>
+                Pending
+              </span>
+              <span style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                color: '#f59e0b',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <FontAwesomeIcon icon={faHourglassHalf} />
+                In Mempool
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div style={{
+          background: '#282729',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '8px',
+          marginBottom: '24px'
+        }}>
+          {/* Transaction Overview */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <h6 style={{ margin: 0, color: '#f1f2f3', fontSize: '0.9rem', fontWeight: 600 }}>
+              Transaction Overview
+            </h6>
+          </div>
+
+          <div style={{ padding: '20px' }}>
+            <div className="row g-3">
+            {/* Transaction Hash */}
+            <div className="col-md-12">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faHashtag} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    TRANSACTION HASH
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <code style={{
+                      fontSize: '0.75rem',
+                      color: '#e2e8f0',
+                      wordBreak: 'break-all',
+                      fontFamily: 'monospace'
+                    }}>
+                      {poolTxData.hash}
+                    </code>
+                  <button
+                    onClick={() => copyToClipboard(poolTxData.hash, 'hash')}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '4px 10px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      cursor: 'pointer',
+                      fontSize: '0.7rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  >
+                    <FontAwesomeIcon icon={faCopy} /> {copied === 'hash' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            </div>
+
+            {/* Unlock Time */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faClock} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    UNLOCK TIME
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#f1f2f3' }}>
+                    {poolTxData.unlock_time === 0 ? 'Immediate' : moment.unix(poolTxData.unlock_time).format('MMMM Do YYYY, h:mm:ss A')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Block */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faCube} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    BLOCK
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 600 }}>
+                    In transaction pool
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Size */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faDatabase} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    SIZE
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 600 }}>
+                    {poolTxData.size.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Type */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faChartLine} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    TYPE
+                  </div>
+                  <span style={{
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    color: '#10b981',
+                    fontSize: '0.75rem',
+                    fontWeight: 600
+                  }}>
+                    {poolTxData.type}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Fee */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faCoins} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    FEE
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                      {poolTxData.fee_formatted}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Input */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faCoins} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    TOTAL INPUT
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                      {poolTxData.amount_in_formatted}
+                    </span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginLeft: '4px' }}>
+                      {config.ticker}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Output */}
+            <div className="col-md-6">
+              <div style={{
+                padding: '14px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px'
+              }}>
+                <FontAwesomeIcon icon={faCoins} style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '4px' }}>
+                    TOTAL OUTPUT
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                      {poolTxData.amount_out_formatted}
+                    </span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginLeft: '4px' }}>
+                      {config.ticker}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        {/* Inputs */}
+        <div style={{
+          background: '#282729',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '8px',
+          marginBottom: '24px'
+        }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h6 style={{ margin: 0, color: '#f1f2f3', fontSize: '0.9rem', fontWeight: 600 }}>
+                Inputs
+              </h6>
+              <span style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                color: '#10b981',
+                fontSize: '0.75rem',
+                fontWeight: 600
+              }}>
+                {poolTxData.inputs.length}
+              </span>
+            </div>
+          </div>
+
+          {poolTxData.inputs.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', marginBottom: 0 }}>
+                <thead>
+                  <tr style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      #
+                    </th>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Amount
+                    </th>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      From Address
+                    </th>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Spending
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poolTxData.inputs.map((input, index) => (
+                    <tr key={index} style={{ borderBottom: index === poolTxData.inputs.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)' }}>
+                      <td style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                        {index + 1}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{ color: '#10b981', fontSize: '0.875rem', fontWeight: 600 }}>
+                          {input.amount_formatted}
+                        </span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginLeft: '4px' }}>
+                          {config.ticker}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <Link
+                          to={`/wallet/${input.from_address}`}
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#FF8AFB',
+                            fontFamily: 'monospace',
+                            wordBreak: 'break-all',
+                            textDecoration: 'underline',
+                            textDecorationStyle: 'dotted'
+                          }}
+                        >
+                          {input.from_address?.substring(0, 16)}...
+                        </Link>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <Link
+                          to={`/transaction/${input.spending.transaction_hash}`}
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#FF8AFB',
+                            fontFamily: 'monospace',
+                            wordBreak: 'break-all',
+                            textDecoration: 'underline',
+                            textDecorationStyle: 'dotted'
+                          }}
+                        >
+                          #{input.spending.output_index}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)' }}>
+              No inputs
+            </div>
+          )}
+        </div>
+
+        {/* Outputs */}
+        <div style={{
+          background: '#282729',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '8px',
+          marginBottom: '24px'
+        }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h6 style={{ margin: 0, color: '#f1f2f3', fontSize: '0.9rem', fontWeight: 600 }}>
+                Outputs
+              </h6>
+              <span style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                color: '#10b981',
+                fontSize: '0.75rem',
+                fontWeight: 600
+              }}>
+                {poolTxData.outputs.length}
+              </span>
+            </div>
+          </div>
+
+          {poolTxData.outputs.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', marginBottom: 0 }}>
+                <thead>
+                  <tr style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      #
+                    </th>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Amount
+                    </th>
+                    <th style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Address
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {poolTxData.outputs.map((output, index) => (
+                    <tr key={index} style={{ borderBottom: index === poolTxData.outputs.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.03)' }}>
+                      <td style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                        {output.index}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{ color: '#10b981', fontSize: '0.875rem', fontWeight: 600 }}>
+                          {output.amount_formatted}
+                        </span>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.75rem', marginLeft: '4px' }}>
+                          {config.ticker}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <Link
+                          to={`/wallet/${output.address}`}
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#FF8AFB',
+                            fontFamily: 'monospace',
+                            wordBreak: 'break-all',
+                            textDecoration: 'underline',
+                            textDecorationStyle: 'dotted'
+                          }}
+                        >
+                          {output.address?.substring(0, 16)}...
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)' }}>
+              No outputs
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Confirmed transaction rendering
+  const { block, tx, txDetails } = txData!;
   const totalInput = tx.vin.reduce((sum, input) => sum + (input.value?.amount || 0), 0);
   const isCoinbase = (txDetails.tx_types[0] || '').toLowerCase() === 'miner' || (txDetails.tx_types[0] || '').toLowerCase() === 'mining';
 
